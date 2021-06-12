@@ -32,7 +32,7 @@ Clone this repository in the `src/platforms/esp32/components` directory of the A
     shell$ cd .../AtomVM/src/platforms/esp32/components
     shell$ git clone https://github.com/fadushin/atomvm_adc.git
 
-Create a `component_nifs.txt` file, if it does not already exist, in `src/platforms/esp32/main`.  The contents of this file should contain a line for the `atomvm_adc` nif:
+After running a full build, edit the `component_nifs.txt` file in `src/platforms/esp32/main` (this file will be created as the result of running a build).  The contents of this file should contain a line for the `atomvm_adc` nif:
 
     atomvm_adc
 

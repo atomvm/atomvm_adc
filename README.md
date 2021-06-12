@@ -10,6 +10,6 @@ For more information about the Analog Digital Converter on the ESP32, see the [I
 
 Documentation for this Nif can be found in the following sections:
 
-* [Build Instructions](doc/build.md)
-* [Programmer's Guide](doc/guide.md)
-* [Example Program](doc/example.md)
+* [Build Instructions](markdown/build.md)
+* [Programmer's Guide](markdown/guide.md)
+* [Example Program](examples/adc_example/README.md)
