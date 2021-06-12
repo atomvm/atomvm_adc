@@ -2,19 +2,13 @@
 
 The `atomvm_adc` library can be used to take voltage readings from any of the 8 GPIO pins used for reading voltage signals on an ESP32 on the IDF SDK ADC1 interface, specifically for pins 32-39.
 
-There are two components to the library:
-
-* An AtomVM Nif, containing C code that interfaces directly with the IDF SDK;
-* A thin set of Erlang modules, which provide a simplified API for interfacing with the ADC on the ESP32 device.
-
-In general, developers need only use the simplied API, and let the underlying Nif code manage all of the intricacies of interfacing with the IDF SDK.
-
 The Espressif IDF SDK and ESP32 device provides two ADC interfaces, ADC1 and ADC2.  ADC1 supports GPIO pins 32-39 for taking voltage readings, while ADC2 supports GPIO pins 0, 2, 4, 12-15, and 25-27, but with some limitations.  Currently, the `atomvm_adc` library provides integration with the ADC1 interface only; there is no support for reading voltage signals on the IDF SDK ADC2 interface, but that may be added in the future, if the need arises.
 
 AtomVM programmers interface with the `atomvm_adc` API via the `adc` module, which provides operations for starting and stopping an Erlang process associated with a specified pin, and for taking readings on that pin.
 
 The following code illustrates simplest use of the `atomvm_adc` API:
 
+    %% erlang
     start() ->
         Pin = 34,
         {ok, ADC} = adc:start(Pin),
@@ -32,7 +26,7 @@ The following code illustrates simplest use of the `atomvm_adc` API:
 
 The `adc:start/1` and `adc:start/2` functions will initialize a specified GPIO pin for ADC readings.  The `adc:start/2` function allows users to specify the bit width and attenuation associated with the specified pin (see below).  Both functions return a reference to the ADC pin, which is used in subsequent operations.
 
-The `adc:read/1` and `adc:read/2` operations are used to read values from an input pin.  Readings are given in both raw and millivoltage values, both integers, expressed as a pair `{Raw, MilliVolts}`.  Teh `adc:read/2` function can be used to specify additional options to control the behavior of the read operation (see below).
+The `adc:read/1` and `adc:read/2` operations are used to read values from an input pin.  Readings are given in both raw values and millivolts, both integers, expressed as a pair `{Raw, MilliVolts}`.  The `adc:read/2` function can be used to specify additional options to control the behavior of the read operation (see below).
 
 The range of raw values is determined by the configured bit width, specified as an option in the `adc:start/2` function, e.g., `adc:start(Pin, [{bit_width, bit_10}])`.  The `adc:start/1` function will supply a default bit width of `bit_12`.
 
@@ -51,7 +45,7 @@ By default, the bit resolution is `bit_12`.
 
 The range of millivolts is determined by the attenuation setting configured for a given pin, specified as an option in the `adc:start/2` function, e.g., `adc:start(Pin, [{attenuation, db_6}])`.  The `adc:start/1` function will supply a default attenuation of `db_0`.
 
-Attenuation settings and it corresponding voltage ranges is descibed in the [IDF SDK Documentation](https://docs.espressif.com/projects/esp-idf/en/v3.3.4/api-reference/peripherals/adc.html#_CPPv425adc1_config_channel_atten14adc1_channel_t11adc_atten_t) and is summarized in the following table:
+Attenuation settings and it corresponding voltage ranges is described in the [IDF SDK Documentation](https://docs.espressif.com/projects/esp-idf/en/v3.3.4/api-reference/peripherals/adc.html#_CPPv425adc1_config_channel_atten14adc1_channel_t11adc_atten_t) and is summarized in the following table:
 
 | Attenuation | Voltage Range |
 | ----------- | ------------- |

@@ -1,0 +1,6 @@
+.vscode/*
+_build/**
+examples/*/rebar.lock
+examples/*/_build/**
+examples/*/_checkouts/**
+rebar.lock
