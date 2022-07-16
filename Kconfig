@@ -1,0 +1,9 @@
+menu "ATOMVM_ADC Configuration"
+
+config AVM_ADC_ENABLE
+	bool  "Enable AtomVM ADC driver"
+	default y
+	help
+		Use this parameter to enable or disable the AtomVM ADC driver.
+
+endmenu

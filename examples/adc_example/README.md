@@ -24,7 +24,7 @@ Build the example program and flash to your device:
     shell$ cd .../AtomVM/src/platforms/esp32/components/atomvm_dht/examples/adc_example
     shell$ rebar3 esp32_flash -p /dev/ttyUSB0
 
-> Note.  This build step makes use of the [`atomvm_rebar3_plugin`](https://github.com/fadushin/atomvm_rebar3_plugin).  See the `README.md` for information about parameters for setting the serial port and baud rate for your platform.
+> Note.  This build step makes use of the [`atomvm_rebar3_plugin`](https://github.com/atomvm/atomvm_rebar3_plugin).  See the `README.md` for information about parameters for setting the serial port and baud rate for your platform.
 
 Attach to the console usin gthe `monitor` Make target in the AtomVM ESP32 build:
 

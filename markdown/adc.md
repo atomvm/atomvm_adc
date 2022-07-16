@@ -1,6 +1,20 @@
-# Programmer's Guide
+# ADC
 
-The `atomvm_adc` library can be used to take voltage readings from any of the 8 GPIO pins used for reading voltage signals on an ESP32 on the IDF SDK ADC1 interface, specifically for pins 32-39.
+The AtomVM ADC library can be used to take voltage readings from any of the 8 GPIO pins used for reading voltage signals on an ESP32 on the IDF SDK ADC1 interface, specifically for pins 32-39.
+
+The AtomVM ADC library is only supported on the ESP32 platform.
+
+## Build Instructions
+
+The AtomVM ADC library is implemented as an AtomVM component, which includes some native C code that must be linked into the ESP32 AtomVM image.  In order to build and deploy this client code, you must build an AtomVM binary image with this component compiled and linked into the image.
+
+For general instructions about how to build AtomVM and include third-party components into an AtomVM image, see the [AtomVM Build Instructions](https://doc.atomvm.net/build-instructions.html).
+
+Once the AtomVM image including this component has been built, you can flash the image to your ESP32 device.  For instructions about how to flash AtomVM images to your ESP32 device, see the AtomVM [Getting Started Guide](https://doc.atomvm.net/getting-started-guide.html).
+
+Once the AtomVM image including this component has been flashed to your ESP32 device, you can then include this project into your [`rebar3`](https://www.rebar3.org) project using the [`atomvm_rebar3_plugin`](https://github.com/atomvm/atomvm_rebar3_plugin), which provides targets for building AtomVM packbeam files and flashing them to your device.
+
+## Programmer's Guide
 
 The Espressif IDF SDK and ESP32 device provides two ADC interfaces, ADC1 and ADC2.  ADC1 supports GPIO pins 32-39 for taking voltage readings, while ADC2 supports GPIO pins 0, 2, 4, 12-15, and 25-27, but with some limitations.  Currently, the `atomvm_adc` library provides integration with the ADC1 interface only; there is no support for reading voltage signals on the IDF SDK ADC2 interface, but that may be added in the future, if the need arises.
 

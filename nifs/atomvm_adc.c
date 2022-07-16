@@ -23,6 +23,7 @@
 
 #include <context.h>
 #include <defaultatoms.h>
+#include <esp32_sys.h>
 #include <interop.h>
 #include <nifs.h>
 #include <term.h>
@@ -309,3 +310,8 @@ const struct Nif *atomvm_adc_get_nif(const char *nifname)
     }
     return NULL;
 }
+
+#include <sdkconfig.h>
+#ifdef CONFIG_AVM_ADC_ENABLE
+REGISTER_NIF_COLLECTION(atomvm_adc, atomvm_adc_init, atomvm_adc_get_nif)
+#endif
