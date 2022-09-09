@@ -55,7 +55,14 @@ static const char *const db_11_atom           = "\x5"  "db_11";
 static const char *const samples_atom         = "\x7"  "samples";
 static const char *const raw_atom             = "\x3"  "raw";
 static const char *const voltage_atom         = "\x7"  "voltage";
-//                                                      123456789ABCDEF01
+
+static const char *const invalid_pin_atom     = "\xb"  "invalid_pin";
+static const char *const invalid_width_atom   = "\xd"  "invalid_width";
+static const char *const invalid_db_atom      = "\xa"  "invalid_db";
+#ifdef CONFIG_AVM_ADC2_ENABLE
+static const char *const timeout_atom         = "\x7"  "timeout";
+#endif
+//                                                      123456789abcdef10
 
 static adc_bits_width_t get_width(Context *ctx, term width)
 {
@@ -114,7 +121,14 @@ static term nif_adc_config_width(Context *ctx, int argc, term argv[])
         int Pin = term_to_int(pin);
         #endif
         TRACE("Pin %i is not a valid adc pin.\n", Pin);
-        RAISE_ERROR(BADARG_ATOM);
+        if (UNLIKELY(memory_ensure_free(ctx, 3) != MEMORY_GC_OK)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        } else {
+            term error_tuple = term_alloc_tuple(2, ctx);
+            term_put_tuple_element(error_tuple, 0, ERROR_ATOM);
+            term_put_tuple_element(error_tuple, 1, context_make_atom(ctx, invalid_pin_atom));
+            return error_tuple;
+        }
     }
 
     term width = argv[1];
@@ -391,7 +405,14 @@ static term nif_adc_take_reading(Context *ctx, int argc, term argv[])
             esp_err_t r = adc2_get_raw((adc2_channel_t) channel, bit_width, &read_raw);
             if (UNLIKELY(r == ESP_ERR_TIMEOUT)) {
                 ESP_LOGW(TAG, "ADC2 in use by Wi-Fi! Use adc:wifi_release/0 to stop wifi and free adc2 for reading.\n");
-                RAISE_ERROR(ERROR_ATOM);
+                if (UNLIKELY(memory_ensure_free(ctx, 3) != MEMORY_GC_OK)) {
+                    RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+                } else {
+                    term error_tuple = term_alloc_tuple(2, ctx);
+                    term_put_tuple_element(error_tuple, 0, ERROR_ATOM);
+                    term_put_tuple_element(error_tuple, 1, context_make_atom(ctx, timeout_atom));
+                    return error_tuple;
+                }
             }
             adc_reading += read_raw;
         }
@@ -453,6 +474,11 @@ static const struct Nif adc_take_reading_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_adc_take_reading
 };
+static const struct Nif adc_pin_is_adc2_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_adc_pin_is_adc2
+};
 
 //
 // Component Nif Entrypoints
@@ -489,6 +515,10 @@ const struct Nif *atomvm_adc_get_nif(const char *nifname)
     if (strcmp("adc:take_reading/4", nifname) == 0) {
         TRACE("Resolved platform nif %s ...\n", nifname);
         return &adc_take_reading_nif;
+    }
+    if (strcmp("adc:pin_is_adc2/1", nifname) == 0) {
+        TRACE("Resolved platform nif %s ...\n", nifname);
+        return &adc_pin_is_adc2_nif;
     }
     return NULL;
 }
