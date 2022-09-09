@@ -228,6 +228,13 @@ static term nif_adc_take_reading(Context *ctx, int argc, term argv[])
         esp_adc_cal_characterize(ADC_UNIT_1, atten, bit_width, DEFAULT_VREF, adc_chars);
     log_char_val_type(val_type);
 
+    // adc1_config_width() is used here in case the last adc1 pin to be configured was of a different width.
+    // this will ensure the calibration characteristics and reading match the desired bit width for the channel.
+    esp_err_t err = adc1_config_width(bit_width);
+    if (err != ESP_OK) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
     uint32_t adc_reading = 0;
     for (avm_int_t i = 0;  i < samples_val;  ++i) {
         adc_reading += adc1_get_raw((adc1_channel_t) channel);
