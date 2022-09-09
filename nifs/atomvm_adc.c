@@ -20,7 +20,15 @@
 #include <esp_adc_cal.h>
 #include <esp_log.h>
 #include <driver/adc.h>
-
+#ifdef CONFIG_AVM_ADC2_ENABLE
+#  if defined __has_include
+#    if __has_include (<driver/adc2_wifi_private.h>)
+#      include <driver/adc2_wifi_private.h>
+#    elif  __has_include (<driver/adc2_wifi_internal.h>)
+#      include <driver/adc2_wifi_internal.h>
+#    endif
+#  endif
+#endif
 #include <context.h>
 #include <defaultatoms.h>
 #include <esp32_sys.h>
@@ -39,6 +47,8 @@
 
 // References
 // https://docs.espressif.com/projects/esp-idf/en/v3.3.4/api-reference/peripherals/adc.html
+// https://docs.espressif.com/projects/esp-idf/en/v4.2.3/api-reference/peripherals/adc.html << v4.2 switch from adc2_wifi_internal.h to adc2_wifi_private.h
+// https://docs.espressif.com/projects/esp-idf/en/v4.4.2/api-reference/peripherals/adc.html
 //
 
 static const char *const bit_9_atom           = "\x5"  "bit_9";
@@ -77,6 +87,12 @@ static adc_bits_width_t get_width(Context *ctx, term width)
     } else {
         return ADC_WIDTH_MAX;
     }
+    #else
+    UNUSED(ctx)
+    UNUSED(width);
+    return ADC_WIDTH_BIT_DEFAULT;
+    #endif
+
 }
 
 static adc_unit_t adc_unit_from_pin(int pin_val)
@@ -440,6 +456,53 @@ static term nif_adc_take_reading(Context *ctx, int argc, term argv[])
     }
 }
 
+static term nif_adc_wifi_lock(Context *ctx, int argc, term argv[])
+{
+    #ifdef CONFIG_AVM_ADC2_ENABLE
+    UNUSED(argc);
+    UNUSED(argv);
+
+    esp_err_t lock = adc2_wifi_acquire();
+    if (UNLIKELY(lock == ESP_ERR_TIMEOUT)) {
+        // This should never happen, but it is reserved for future use in the ESP-IDF adc API.
+        ESP_LOGE(TAG, "Unknown timeout acquiring WiFi lock on ADC2.\n");
+        if (UNLIKELY(memory_ensure_free(ctx, 3) != MEMORY_GC_OK)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        } else {
+            term error_tuple = term_alloc_tuple(2, ctx);
+            term_put_tuple_element(error_tuple, 0, ERROR_ATOM);
+            term_put_tuple_element(error_tuple, 1, context_make_atom(ctx, timeout_atom));
+            return error_tuple;
+        }
+    }
+    TRACE("WiFi lock acquired on ADC2.\n");
+    return OK_ATOM;
+    #else
+    ESP_LOGE(TAG, "Ignoring, not needed for ADC1! ADC2 driver not available! Enable it in menuconfig.\n");
+    return OK_ATOM;
+    #endif
+}
+
+static term nif_adc_wifi_free(Context *ctx, int argc, term argv[])
+{
+    #ifdef CONFIG_AVM_ADC2_ENABLE
+    UNUSED(argc);
+    UNUSED(argv);
+
+    esp_err_t unlock = adc2_wifi_release();
+    if (UNLIKELY(unlock != ESP_OK)) {
+        ESP_LOGE(TAG, "Unable to free WiFi lock on ADC2.\n");
+        return ERROR_ATOM;
+    } else {
+        TRACE("WiFi lock released on ADC2.\n");
+        return OK_ATOM;
+    }
+    #else
+    ESP_LOGE(TAG, "ADC2 driver not available! Enable it in menuconfig.");
+    return OK_ATOM;
+    #endif
+}
+
 static term nif_adc_pin_is_adc2(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
@@ -473,6 +536,16 @@ static const struct Nif adc_take_reading_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_adc_take_reading
+};
+static const struct Nif adc_wifi_lock_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_adc_wifi_lock
+};
+static const struct Nif adc_wifi_free_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_adc_wifi_free
 };
 static const struct Nif adc_pin_is_adc2_nif =
 {
@@ -515,6 +588,14 @@ const struct Nif *atomvm_adc_get_nif(const char *nifname)
     if (strcmp("adc:take_reading/4", nifname) == 0) {
         TRACE("Resolved platform nif %s ...\n", nifname);
         return &adc_take_reading_nif;
+    }
+    if (strcmp("adc:wifi_lock/0", nifname) == 0) {
+        TRACE("Resolved platform nif %s ...\n", nifname);
+        return &adc_wifi_lock_nif;
+    }
+    if (strcmp("adc:wifi_free/0", nifname) == 0) {
+        TRACE("Resolved platform nif %s ...\n", nifname);
+        return &adc_wifi_free_nif;
     }
     if (strcmp("adc:pin_is_adc2/1", nifname) == 0) {
         TRACE("Resolved platform nif %s ...\n", nifname);

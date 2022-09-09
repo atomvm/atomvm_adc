@@ -23,9 +23,9 @@
 -module(adc).
 
 -export([
-    start/1, start/2, stop/1, read/1, read/2
+    start/1, start/2, stop/1, read/1, read/2, wifi_acquire/0, wifi_release/0
 ]).
--export([config_width/2, config_channel_attenuation/2, take_reading/4]). %% internal nif APIs
+-export([config_width/2, config_channel_attenuation/2, take_reading/4, wifi_lock/0, wifi_free/0, pin_is_adc2/1]). %% internal nif APIs
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -behaviour(gen_server).
@@ -97,7 +97,33 @@ start(Pin, Options) ->
 %%-----------------------------------------------------------------------------
 -spec stop(ADC::adc()) -> ok.
 stop(ADC) ->
+    ok = maybe_pid_list_remove(ADC),
     gen_server:stop(ADC).
+
+%%-----------------------------------------------------------------------------
+%% @returns ok
+%% @doc     For WIFI module to claim the usage of ADC2.
+%%
+%% Other tasks will be forbidden to use ADC2 between adc:wifi_acquire/0 and adc:wifi_release/0.
+%% The WIFI module may have to wait for a short time for the current conversion (if exist) to finish.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec wifi_acquire() -> ok.
+wifi_acquire() ->
+    ok = stop_adc2_pids(),
+    adc:wifi_lock().
+
+%%-----------------------------------------------------------------------------
+%% @returns ok
+%% @doc     For WIFI module to release ADC2 for other tasks.
+%%
+%% Other tasks will be forbidden to use ADC2 between adc:wifi_acquire/0 and adc:wifi_release/0.
+%% Call this function to release the WiFi lock on ADC2.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec wifi_release() -> ok.
+wifi_release() ->
+    adc:wifi_free().
 
 %%-----------------------------------------------------------------------------
 %% @param   Pin         pin from which to read ADC
@@ -155,6 +181,13 @@ init([Pin, Options]) ->
         {error, R2} ->
             throw({config_channel_attenuation, R2})
     end,
+    ADC2 = adc:pin_is_adc2(Pin),
+    case (ADC2) of
+        true ->
+            adc2_pid_list_add(self());
+        false ->
+            ok
+    end,
     {ok, #state{
         pin=Pin, bit_width=BitWidth, attenuation=Attenuation
     }}.
@@ -183,7 +216,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %%
-%% internal operations
+%% internal nif API operations
 %%
 
 %% @hidden
@@ -197,3 +230,90 @@ config_channel_attenuation(_Pin, _Attenuation) ->
 %% @hidden
 take_reading(_Pin, _ReadOptions, _BitWidth, _Attenuation) ->
     throw(nif_error).
+
+%% @hidden
+wifi_lock() ->
+    throw(nif_error).
+
+%% @hidden
+wifi_free() ->
+    throw(nif_error).
+
+%% @hidden
+pin_is_adc2(_Pin) ->
+    throw(nif_error).
+
+%%
+%% internal operations
+%%
+
+%% @hidden
+adc2_pid_list([PIDs]) ->
+    receive
+        {get, Sender} ->
+            Sender ! [PIDs],
+            adc2_pid_list([PIDs]);
+        {add, [PID]} ->
+            NewList = [PID | PIDs],
+            adc2_pid_list([NewList]);
+        {remove, PID}  ->
+            NewList = lists:delete(PID, PIDs),
+                case (NewList) of
+                    [] ->
+                        %% TODO: unregister and stop the process.
+                        %% unregister/1 is not available so for now we keep
+                        %% the process alive with the empty list.
+                        adc2_pid_list([NewList]);
+                        % erlang:unregister(adc2_pidlist);
+                    [_List] ->
+                        adc2_pid_list([NewList])
+                end
+    end.
+
+%% @hidden
+adc2_pid_list_add(PID) ->
+    StopList = whereis(adc2_pidlist),
+    List = [PID],
+    case (StopList) of
+        undefined ->
+            Adc2Pids = spawn(fun() -> adc2_pid_list([List]) end),
+            register(adc2_pidlist, Adc2Pids),
+            ok;
+        _Pid ->
+            StopList ! {add, [PID]},
+            ok
+    end.
+
+%% @hidden
+maybe_pid_list_remove(PID) ->
+    StopList = whereis(adc2_pidlist),
+    case (StopList) of
+        undefined ->
+            ok;
+        _Pid ->
+            StopList ! {remove, PID},
+            ok
+    end.
+
+%% @hidden
+stop_adc2_pids() ->
+    StopList = whereis(adc2_pidlist),
+    case erlang:is_process_alive(StopList) of
+        true ->
+            StopList ! {get, self()},
+            receive
+                [StopList] ->
+                    stop_pids([StopList])
+            end
+    end.
+
+%% @hidden
+stop_pids([PIDs]) ->
+    [Pid | PID_List] = PIDs,
+    ok = stop(Pid),
+    case (PID_List) of
+        [] ->
+            ok;
+        [_list] ->
+            stop_pids([PID_List])
+    end.
