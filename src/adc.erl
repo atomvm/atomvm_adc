@@ -25,13 +25,15 @@
 -export([
     start/1, start/2, stop/1, read/1, read/2
 ]).
--export([config_width/1, config_channel_attenuation/2, take_reading/4]). %% internal nif APIs
+-export([config_width/2, config_channel_attenuation/2, take_reading/4]). %% internal nif APIs
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -behaviour(gen_server).
 
 -type adc() :: term().
--type adc_pin() :: 32..39.
+-type adc_pin() ::  adc1_pin() | adc2_pin().
+-type adc1_pin() :: 32..39.
+-type adc2_pin() :: 0 | 2 | 4 | 12..15 | 25..27.
 -type options() :: [option()].
 -type bit_width() :: bit_9 | bit_10 | bit_11 | bit_12.
 -type attenuation() :: db_0 | db_2_5 | db_6 | db_11.
@@ -142,7 +144,7 @@ read(ADC, ReadOptions) ->
 %% @hidden
 init([Pin, Options]) ->
     BitWidth = proplists:get_value(bit_width, Options, bit_12),
-    case adc:config_width(BitWidth) of
+    case adc:config_width(Pin, BitWidth) of
         ok -> ok;
         {error, R1} ->
             throw({config_width, R1})
@@ -185,7 +187,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%
 
 %% @hidden
-config_width(_BitWidth) ->
+config_width(_Pin, _BitWidth) ->
     throw(nif_error).
 
 %% @hidden

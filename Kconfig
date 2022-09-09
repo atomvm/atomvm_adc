@@ -1,9 +1,23 @@
 menu "ATOMVM_ADC Configuration"
 
-config AVM_ADC_ENABLE
-	bool  "Enable AtomVM ADC driver"
-	default y
-	help
-		Use this parameter to enable or disable the AtomVM ADC driver.
+    config AVM_ADC_ENABLE
+	    bool "Enable AtomVM ADC driver"
+	    default y
+	    help
+		    Use this parameter to enable or disable the AtomVM ADC driver.
+
+    config AVM_ADC2_ENABLE
+        depends on AVM_ADC_ENABLE
+        bool "Enable ADC Unit 2"
+        default n
+        help
+            This will allow using both ADC units.
+
+            ADC2 is used by the Wi-Fi driver. The application can only use ADC2 when the
+            wifi driver is not in use. If you need to use wifi in your AtomVM application
+            first use adc:wifi_acquire/0 to stop adc2 after the current conversion (if any)
+            before starting wifi. This will block any attempts to read adc2 until the
+            application uses adc:wifi_release/0 to stop the wifi driver and free the adc2
+            unit for other tasks.
 
 endmenu
