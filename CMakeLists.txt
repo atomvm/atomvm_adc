@@ -25,7 +25,7 @@ set(ATOMVM_ADC_COMPONENT_SRCS
 idf_component_register(
     SRCS ${ATOMVM_ADC_COMPONENT_SRCS}
     INCLUDE_DIRS "nifs/include"
-    PRIV_REQUIRES "libatomvm" "main" "esp_adc_cal"
+    PRIV_REQUIRES "libatomvm" "avm_sys" "esp_adc_cal"
 )
 
 idf_build_set_property(
