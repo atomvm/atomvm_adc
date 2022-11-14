@@ -51,6 +51,7 @@
 // https://docs.espressif.com/projects/esp-idf/en/v4.4.2/api-reference/peripherals/adc.html
 //
 
+#if CONFIG_IDF_TARGET_ESP32
 static const char *const bit_9_atom           = "\x5"  "bit_9";
 static const char *const bit_10_atom          = "\x6"  "bit_10";
 static const char *const bit_11_atom          = "\x6"  "bit_11";
@@ -76,13 +77,15 @@ static const char *const timeout_atom         = "\x7"  "timeout";
 
 static adc_bits_width_t get_width(Context *ctx, term width)
 {
+    #if CONFIG_IDF_TARGET_ESP32
     if (width == context_make_atom(ctx, bit_9_atom)) {
         return ADC_WIDTH_BIT_9;
     } else if (width == context_make_atom(ctx, bit_10_atom)) {
         return ADC_WIDTH_BIT_10;
     } else if (width == context_make_atom(ctx, bit_11_atom)) {
         return ADC_WIDTH_BIT_11;
-    } else if (width == context_make_atom(ctx, bit_12_atom)) {
+    } else
+    if (width == context_make_atom(ctx, bit_12_atom)) {
         return ADC_WIDTH_BIT_12;
     } else {
         return ADC_WIDTH_MAX;
@@ -98,6 +101,7 @@ static adc_bits_width_t get_width(Context *ctx, term width)
 static adc_unit_t adc_unit_from_pin(int pin_val)
 {
     switch (pin_val) {
+        #if CONFIG_IDF_TARGET_ESP32
         case 32:
         case 33:
         case 34:
@@ -106,8 +110,27 @@ static adc_unit_t adc_unit_from_pin(int pin_val)
         case 37:
         case 38:
         case 39:
+        #elif CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10:
+        #elif CONFIG_IDF_TARGET_ESP32C3
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        #endif
             return ADC_UNIT_1;
         #ifdef CONFIG_AVM_ADC2_ENABLE
+        #if CONFIG_IDF_TARGET_ESP32
         case 0:
         case 2:
         case 4:
@@ -118,6 +141,20 @@ static adc_unit_t adc_unit_from_pin(int pin_val)
         case 25:
         case 26:
         case 27:
+        #elif CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32S2
+        case 11:
+        case 12:
+        case 13:
+        case 14:
+        case 15:
+        case 16:
+        case 17:
+        case 18:
+        case 19:
+        case 20:
+        #elif CONFIG_IDF_TARGET_ESP32C3
+        case 5:
+        #endif
             return ADC_UNIT_2;
         #endif
         default:
@@ -132,7 +169,7 @@ static term nif_adc_config_width(Context *ctx, int argc, term argv[])
     term pin = argv[0];
     VALIDATE_VALUE(pin, term_is_integer);
     adc_unit_t adc_unit = adc_unit_from_pin(term_to_int(pin));
-    if (adc_unit == ADC_UNIT_MAX) {
+    if (UNLIKELY(adc_unit == ADC_UNIT_MAX)) {
         #ifdef ENABLE_TRACE
         int Pin = term_to_int(pin);
         #endif
@@ -202,6 +239,7 @@ static adc_atten_t get_attenuation(Context *ctx, term attenuation)
 static adc_channel_t get_channel(avm_int_t pin_val)
 {
     switch (pin_val) {
+        #if CONFIG_IDF_TARGET_ESP32
         case 32:
             return ADC1_CHANNEL_4;
         case 33:
@@ -218,7 +256,41 @@ static adc_channel_t get_channel(avm_int_t pin_val)
             return ADC1_CHANNEL_2;
         case 39:
             return ADC1_CHANNEL_3;
-        #ifdef CONFIG_AVM_ADC2_ENABLE
+        #elif CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3
+        case 1:
+            return ADC1_CHANNEL_0;
+        case 2:
+            return ADC1_CHANNEL_1;
+        case 3:
+            return ADC1_CHANNEL_2;
+        case 4:
+            return ADC1_CHANNEL_3;
+        case 5:
+            return ADC1_CHANNEL_4;
+        case 6:
+            return ADC1_CHANNEL_5;
+        case 7:
+            return ADC1_CHANNEL_6;
+        case 8:
+            return ADC1_CHANNEL_7;
+        case 9:
+            return ADC1_CHANNEL_8;
+        case 10:
+            return ADC1_CHANNEL_9;
+        #elif CONFIG_IDF_TARGET_ESP32C3
+        case 0:
+            return ADC1_CHANNEL_0;
+        case 1:
+            return ADC1_CHANNEL_1;
+        case 2:
+            return ADC1_CHANNEL_2;
+        case 3:
+            return ADC1_CHANNEL_3;
+        case 4:
+            return ADC1_CHANNEL_4;
+        #endif
+    #ifdef CONFIG_AVM_ADC2_ENABLE
+        #if CONFIG_IDF_TARGET_ESP32
         case 0:
             return ADC2_CHANNEL_1;
         case 2:
@@ -239,7 +311,32 @@ static adc_channel_t get_channel(avm_int_t pin_val)
             return ADC2_CHANNEL_9;
         case 27:
             return ADC2_CHANNEL_7;
+        #elif CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3
+        case 11:
+            return ADC2_CHANNEL_0;
+        case 12:
+            return ADC2_CHANNEL_1;
+        case 13:
+            return ADC2_CHANNEL_2;
+        case 14:
+            return ADC2_CHANNEL_3;
+        case 15:
+            return ADC2_CHANNEL_4;
+        case 16:
+            return ADC2_CHANNEL_5;
+        case 17:
+            return ADC2_CHANNEL_6;
+        case 18:
+            return ADC2_CHANNEL_7;
+        case 19:
+            return ADC2_CHANNEL_8;
+        case 20:
+            return ADC2_CHANNEL_9;
+        #elif CONFIG_IDF_TARGET_ESP32C3
+        case 5:
+            return ADC2_CHANNEL_0;
         #endif
+    #endif
         default:
             return ADC_CHANNEL_MAX;
     }
