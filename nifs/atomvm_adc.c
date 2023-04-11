@@ -235,8 +235,8 @@ static term nif_adc_take_reading(Context *ctx, int argc, term argv[])
     adc_reading /= samples_val;
     TRACE("take_reading adc_reading: %i\n", adc_reading);
 
-    raw = term_equals(raw, TRUE_ATOM, ctx) ? term_from_int32(adc_reading) : UNDEFINED_ATOM;
-    if (term_equals(voltage, TRUE_ATOM, ctx)) {
+    raw = raw == TRUE_ATOM ? term_from_int32(adc_reading) : UNDEFINED_ATOM;
+    if (voltage == TRUE_ATOM) {
         voltage = term_from_int32(esp_adc_cal_raw_to_voltage(adc_reading, adc_chars));
     } else {
         voltage = UNDEFINED_ATOM;
