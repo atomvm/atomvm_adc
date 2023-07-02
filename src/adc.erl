@@ -17,25 +17,29 @@
 %%-----------------------------------------------------------------------------
 %% @doc ADC support.
 %%
-%% Use this module to take ADC readings on pins 32-39 on an ESP32 device.
+%% Use this module to take ADC readings on an ESP32 device. ADC1 is enabled by 
+%% default and allows taking reading from pins 32-39. If ADC2 is also enabled
+%% pins 0, 2, 4, 12-15, and 25-27 may be used as long as WiFi is not required
+%% by the application. A solution should be available soon to allow for
+%% non-simultaneous use of WiFi and ADC2 channels.
 %% @end
 %%-----------------------------------------------------------------------------
 -module(adc).
 
 -export([
-    start/1, start/2, stop/1, read/1, read/2, wifi_acquire/0, wifi_release/0
+    start/1, start/2, stop/1, read/1, read/2
 ]).
--export([config_width/2, config_channel_attenuation/2, take_reading/4, wifi_lock/0, wifi_free/0, pin_is_adc2/1]). %% internal nif APIs
+-export([config_width/2, config_channel_attenuation/2, take_reading/4, pin_is_adc2/1]). %% internal nif APIs
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -behaviour(gen_server).
 
--type adc() :: term().
+-type adc() :: pid().
 -type adc_pin() ::  adc1_pin() | adc2_pin().
 -type adc1_pin() :: 32..39.
 -type adc2_pin() :: 0 | 2 | 4 | 12..15 | 25..27.
 -type options() :: [option()].
--type bit_width() :: bit_9 | bit_10 | bit_11 | bit_12.
+-type bit_width() :: bit_9 | bit_10 | bit_11 | bit_12 | bit_13 | bit_max.
 -type attenuation() :: db_0 | db_2_5 | db_6 | db_11.
 -type option() :: {bit_width, bit_width()} | {attenuation, attenuation()}.
 
@@ -46,7 +50,7 @@
 -type voltage_reading() :: 0..3300 | undefined.
 -type reading() :: {raw_value(), voltage_reading()}.
 
--define(DEFAULT_OPTIONS, [{bit_width, bit_12}, {attenuation, db_0}]).
+-define(DEFAULT_OPTIONS, [{bit_width, bit_12}, {attenuation, db_11}]).
 -define(DEFAULT_SAMPLES, 64).
 -define(DEFAULT_READ_OPTIONS, [raw, voltage, {samples, ?DEFAULT_SAMPLES}]).
 
@@ -60,7 +64,7 @@
 %%-----------------------------------------------------------------------------
 %% @param   Pin     pin from which to read ADC
 %% @returns ok | {error, Reason}
-%% @equiv   start(Pin, [{bit_width, bit_12}, {attenuation, db_0}])
+%% @equiv   start(Pin, [{bit_width, bit_12}, {attenuation, db_11}])
 %% @doc     Start an ADC.
 %% @end
 %%-----------------------------------------------------------------------------
@@ -74,14 +78,16 @@ start(Pin) ->
 %% @returns ok | {error, Reason}
 %% @doc     Start a ADC.
 %%
-%% Readings will be taken from the specified pin.  If the pin in not in the
-%% range of 32..39, a badarg exception will be raised.
+%% Readings will be taken from the specified pin.  If the pin in not one of the
+%% following: 32..39 (and 0|2|4|12..15|25..27 with adc2 enabled), a badarg
+%% exception will be raised.
 %%
-%% Options may specify the bit width and attenuation.
+%% Options may specify the bit width and attenuation. The attenuation value `bit_max'
+%% may be used to automatically select the highest sample rate supported by your
+%% ESP chip-set.
 %%
-%% Note.  The bit width is applied globally for all ADC pins.  Use this
-%% option with caution, as setting it may have side effects if reading
-%% from multiple pins.
+%% Note. Unlike the esp-idf adc driver bit widths are used on a per pin basis,
+%% so pins on the same adc unit can use different widths if necessary.
 %%
 %% Use the returned reference in subsequent ADC operations.
 %% @end
@@ -97,33 +103,7 @@ start(Pin, Options) ->
 %%-----------------------------------------------------------------------------
 -spec stop(ADC::adc()) -> ok.
 stop(ADC) ->
-    ok = maybe_pid_list_remove(ADC),
     gen_server:stop(ADC).
-
-%%-----------------------------------------------------------------------------
-%% @returns ok
-%% @doc     For WIFI module to claim the usage of ADC2.
-%%
-%% Other tasks will be forbidden to use ADC2 between adc:wifi_acquire/0 and adc:wifi_release/0.
-%% The WIFI module may have to wait for a short time for the current conversion (if exist) to finish.
-%% @end
-%%-----------------------------------------------------------------------------
--spec wifi_acquire() -> ok.
-wifi_acquire() ->
-    ok = stop_adc2_pids(),
-    adc:wifi_lock().
-
-%%-----------------------------------------------------------------------------
-%% @returns ok
-%% @doc     For WIFI module to release ADC2 for other tasks.
-%%
-%% Other tasks will be forbidden to use ADC2 between adc:wifi_acquire/0 and adc:wifi_release/0.
-%% Call this function to release the WiFi lock on ADC2.
-%% @end
-%%-----------------------------------------------------------------------------
--spec wifi_release() -> ok.
-wifi_release() ->
-    adc:wifi_free().
 
 %%-----------------------------------------------------------------------------
 %% @param   Pin         pin from which to read ADC
@@ -156,6 +136,9 @@ read(ADC) ->
 %%
 %% You may specify the number of samples to be taken and averaged over using the tuple
 %% `{samples, Samples::pos_integer()}'.
+%%
+%% If the error `Reason' is timeout and the adc channel is on unit 2 then WiFi is likely
+%% enabled and adc2 readings will no longer be possible.
 %% @end
 %%-----------------------------------------------------------------------------
 -spec read(ADC::adc(), ReadOptions::read_options()) -> {ok, reading()} | {error, Reason::term()}.
@@ -180,13 +163,6 @@ init([Pin, Options]) ->
         ok -> ok;
         {error, R2} ->
             throw({config_channel_attenuation, R2})
-    end,
-    ADC2 = adc:pin_is_adc2(Pin),
-    case (ADC2) of
-        true ->
-            adc2_pid_list_add(self());
-        false ->
-            ok
     end,
     {ok, #state{
         pin=Pin, bit_width=BitWidth, attenuation=Attenuation
@@ -232,88 +208,5 @@ take_reading(_Pin, _ReadOptions, _BitWidth, _Attenuation) ->
     throw(nif_error).
 
 %% @hidden
-wifi_lock() ->
-    throw(nif_error).
-
-%% @hidden
-wifi_free() ->
-    throw(nif_error).
-
-%% @hidden
 pin_is_adc2(_Pin) ->
     throw(nif_error).
-
-%%
-%% internal operations
-%%
-
-%% @hidden
-adc2_pid_list([PIDs]) ->
-    receive
-        {get, Sender} ->
-            Sender ! [PIDs],
-            adc2_pid_list([PIDs]);
-        {add, [PID]} ->
-            NewList = [PID | PIDs],
-            adc2_pid_list([NewList]);
-        {remove, PID}  ->
-            NewList = lists:delete(PID, PIDs),
-                case (NewList) of
-                    [] ->
-                        %% TODO: unregister and stop the process.
-                        %% unregister/1 is not available so for now we keep
-                        %% the process alive with the empty list.
-                        adc2_pid_list([NewList]);
-                        % erlang:unregister(adc2_pidlist);
-                    [_List] ->
-                        adc2_pid_list([NewList])
-                end
-    end.
-
-%% @hidden
-adc2_pid_list_add(PID) ->
-    StopList = whereis(adc2_pidlist),
-    List = [PID],
-    case (StopList) of
-        undefined ->
-            Adc2Pids = spawn(fun() -> adc2_pid_list([List]) end),
-            register(adc2_pidlist, Adc2Pids),
-            ok;
-        _Pid ->
-            StopList ! {add, [PID]},
-            ok
-    end.
-
-%% @hidden
-maybe_pid_list_remove(PID) ->
-    StopList = whereis(adc2_pidlist),
-    case (StopList) of
-        undefined ->
-            ok;
-        _Pid ->
-            StopList ! {remove, PID},
-            ok
-    end.
-
-%% @hidden
-stop_adc2_pids() ->
-    StopList = whereis(adc2_pidlist),
-    case erlang:is_process_alive(StopList) of
-        true ->
-            StopList ! {get, self()},
-            receive
-                [StopList] ->
-                    stop_pids([StopList])
-            end
-    end.
-
-%% @hidden
-stop_pids([PIDs]) ->
-    [Pid | PID_List] = PIDs,
-    ok = stop(Pid),
-    case (PID_List) of
-        [] ->
-            ok;
-        [_list] ->
-            stop_pids([PID_List])
-    end.
