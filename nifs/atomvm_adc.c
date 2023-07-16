@@ -61,7 +61,7 @@ static const AtomStringIntPair attenuation_table[] = {
     { ATOM_STR("\x4", "db_0"), ADC_ATTEN_DB_0 },
     { ATOM_STR("\x6", "db_2_5"), ADC_ATTEN_DB_2_5 },
     { ATOM_STR("\x4", "db_6"), ADC_ATTEN_DB_6 },
-    { ATOM_STR("\x6", "db_11"), ADC_ATTEN_DB_11 },
+    { ATOM_STR("\x5", "db_11"), ADC_ATTEN_DB_11 },
     SELECT_INT_DEFAULT(ADC_ATTEN_MAX)
 };
 

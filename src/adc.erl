@@ -158,7 +158,7 @@ init([Pin, Options]) ->
         {error, R1} ->
             throw({config_width, R1})
     end,
-    Attenuation = proplists:get_value(attenuation, Options, db_0),
+    Attenuation = proplists:get_value(attenuation, Options, db_11),
     case adc:config_channel_attenuation(Pin, Attenuation) of
         ok -> ok;
         {error, R2} ->
